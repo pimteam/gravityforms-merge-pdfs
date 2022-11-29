@@ -1,4 +1,4 @@
-Gravity Forms Merge PDFs
+# Gravity Forms Merge PDFs
 
 This plugin was created to fulfill a need in some workflows to generate a single PDF file from a Gravity Forms entry that included one or more PDF file uploads. In usage scenarios such as these, site users sometimes prefer to have a single PDF file that includes the form entry data, which may be generated using [Gravity PDF](https://gravitypdf.com/) or [Gravity Flow’s PDF Generator](https://gravityflow.io/downloads/pdf-generator/), along with each PDF file uploaded during form submission. In the original usage scenario, our forms were sometimes collecting 10 or more individual PDF uploads, and those who were tasked with reviewing the submissions wanted a single, consolidated file.
 
