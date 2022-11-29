@@ -1,0 +1,27 @@
+{
+    "name": "myokyawhtun/pdfmerger",
+    "description": "PDFMerger for PHP (PHP 5 and up to PHP 7.1 Compatible)",
+    "authors": [
+    	{
+    		"name":"Jarrod Nettles",
+    		"email": "jarrod@squarecrow.com"
+    	},
+    	{
+    		"name":"Vasiliy Zaytsev",
+    		"email":"vasiliy.zaytsev@ffwagency.com"
+    	},
+    	{
+    		"name":"Myo Kyaw Htun",
+    		"email":"myochauhtun@gmail.com"
+    	}
+    ],
+    "require":{
+    	"php": ">=5.2.0"
+    },
+    "minimum-stability":"dev",
+    "autoload":{
+    	"psr-0":{
+    		"PDFMerger": "PDFMerger.php"
+    	}
+    }
+}

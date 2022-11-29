@@ -1,0 +1,30 @@
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: Gravity Forms Merge PDFs\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2022-05-21 19:26+0000\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: \n"
+"Language: \n"
+"Plural-Forms: nplurals=INTEGER; plural=EXPRESSION;\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"X-Generator: Loco https://localise.biz/\n"
+"X-Loco-Version: 2.6.1; wp-5.9.3\n"
+"X-Domain: gravityforms-merge-pdfs"
+
+#. Description of the plugin
+msgid ""
+"Adds a merged PDFs field and inlines PDF uploads into Gravity PDF exports."
+msgstr ""
+
+#. Author of the plugin
+msgid "Gennady Kovshenin"
+msgstr ""
+
+#. Name of the plugin
+msgid "Gravity Forms Merge PDFs"
+msgstr ""
