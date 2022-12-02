@@ -17,4 +17,3 @@ Some Notes
     • The plugin also integrates with PDFs uploaded through Gravity Perks’s Nested Forms.
 
 Although not everyone needs this plugin, enough of our sites did, and given the work and expense required to create and update it, we felt it was too useful not to share with the open source community at large. Have fun!
-

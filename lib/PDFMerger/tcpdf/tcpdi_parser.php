@@ -898,6 +898,8 @@ class tcpdi_parser {
         } else {
             $obj[] = $objval;
         }
+        
+        //var_dump(debug_backtrace( DEBUG_BACKTRACE_PROVIDE_OBJECT, 3));
         return array($obj, $offset);
     }
     private function getDictValue($offset, &$data) {
@@ -1065,7 +1067,7 @@ class tcpdi_parser {
         $ints = preg_split('/\s/', substr($stream[0], 0, $first)); // Get list of object / offset pairs
         for ($j=1; $j<count($ints); $j++) {
             if (($j % 2) == 1) {
-                $this->objstreamobjs[$ints[$j-1]] = array($key, $ints[$j]+$first);
+                $this->objstreamobjs[$ints[$j-1]] = array($key, intval($ints[$j])+$first);
             }
         }
 

@@ -108,16 +108,17 @@ function convert_url_to_path( $url ) {
 * Tests if the PDF generation works with the old library, otherwise falls back to shell commands
 **/
 function gf_merge_pdf_fallback( string $path ) : string {
+    
     // Try the PDF, fix or error out.
     $test = new PDFMerger;
     $test->addPDF( $path );
     //echo $path.'<br>';
-    try {
+   /* try {
         $test->merge( 'string' );
-    } catch ( Exception $e ) {
+    } catch ( Exception $e ) {*/
         
         // Unreadable, let's try to fix with gs
-        error_log( "$path " . $e->getMessage() );
+       // error_log( "$path " . $e->getMessage() );
 
         $repaired_path = tempnam( get_temp_dir(), 'pdf' );
 
@@ -150,7 +151,7 @@ function gf_merge_pdf_fallback( string $path ) : string {
 
             $path = $repaired_path;
         }
-    }
+   // }
     
     return $path;
 }
@@ -170,7 +171,7 @@ add_action( 'init', function() {
 	// check fake nonce
     $check_dnonce = substr( md5( $entry_id * 28 ), 0, 10 );
     if( $check_dnonce != $_GET['dnonce'] ) return;
-
+    
 	$files = gf_merge_pdfs_get_files( $entry_id );
 	
 	require __DIR__ . '/lib/PDFMerger/PDFMerger.php';
