@@ -121,9 +121,9 @@ function gf_merge_pdfs_output( $files, $errors ) {
         
         $cnt_files = count($files);
         if( $cnt_files ) {
-            $file_str = sprintf("\nThere %s %d valid %s for this entry included after this page.", ($cnt_files > 1 ? 'are' : 'is'), $cnt_files, ($cnt_files > 1 ? 'files' : 'file') );
+            $file_str .= sprintf("\nThere %s %d valid %s for this entry included after this page.", ($cnt_files > 1 ? 'are' : 'is'), $cnt_files, ($cnt_files > 1 ? 'files' : 'file') );
         }
-        else $file_str = "\nThere are no valid files for this entry.";
+        else $file_str .= "\nThere are no valid files for this entry.";
         
         $error_file = $dir['path']."/errors-".$entry_id.".pdf";
         
