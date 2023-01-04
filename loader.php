@@ -3,7 +3,7 @@
  * Plugin Name: Gravity Forms Merge PDFs
  * Description: Adds a merged PDFs field and inlines PDF uploads into Gravity PDF exports.
  * Authors: Gennady Kovshenin, Bob Handzhiev
- * Version: 1.3
+ * Version: 1.4
  */
 
 defined( 'ABSPATH' ) || exit;
@@ -12,7 +12,7 @@ define( 'GRAVITY_MERGE_PDFS_DNONCE_MULTIPLIER', 687 ); // multiplier for the bas
 define( 'GRAVITY_MERGE_PDFS_DNONCE_SECRET', 'XF09=*/=JH' ); // secret word for the basic "fake" nonces protection
 define( 'GRAVITY_MERGE_PDFS_USE_NONCES', false ); // whether to use real WP nonces
 
-use PDFMerger\PDFMerger;
+//use PDFMerger\PDFMerger;
 
 add_action( 'gform_loaded', function() {
 	require_once __DIR__ . '/class-gf-merge-pdfs-field.php';
@@ -210,6 +210,35 @@ false && add_filter( 'gravityflowpdf_mpdf', function( $mpdf, $body, $file_path, 
 	$mpdf->WriteHTML( $body );
 	file_put_contents( $output = tempnam( get_temp_dir(), 'merge_pdfs' ), $mpdf->Output( '', 'S' ) );
 
+	return new class( $mpdf ) {
+		public function __construct( $mpdf ) {			
+			$this->mpdf = $mpdf;
+		}
+		public function Output() {
+			array_unshift($files, [0, 0,0, $file_path, '']);	
+            gf_merge_pdfs_output( $files, [] );
+		}
+		public function __call( $f, $args ) {
+			return call_user_func_array( [ $this->mpdf, $f ], $args );
+		}
+	};
+}, 10, 5 );
+
+/*
+false && add_filter( 'gravityflowpdf_mpdf', function( $mpdf, $body, $file_path, $entry, $step ) {
+	$form = GFAPI::get_form( $entry['form_id'] );
+
+	if ( ! GFCommon::get_fields_by_type( $form, 'merge_pdfs' ) ) {
+		return $mpdf;
+	}
+    
+	if ( ! $files = gf_merge_pdfs_get_files( $entry['id'] ) ) {
+		return $mpdf;
+	}
+
+	$mpdf->WriteHTML( $body );
+	file_put_contents( $output = tempnam( get_temp_dir(), 'merge_pdfs' ), $mpdf->Output( '', 'S' ) );
+
 	require __DIR__ . '/lib/PDFMerger/PDFMerger.php';
 
 	$pdf = new PDFMerger;
@@ -232,3 +261,4 @@ false && add_filter( 'gravityflowpdf_mpdf', function( $mpdf, $body, $file_path, 
 		}
 	};
 }, 10, 5 );
+*/
