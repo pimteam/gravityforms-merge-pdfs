@@ -3,7 +3,7 @@
  * Plugin Name: Gravity Forms Merge PDFs
  * Description: Adds a merged PDFs field and inlines PDF uploads into Gravity PDF exports.
  * Authors: Gennady Kovshenin, Bob Handzhiev
- * Version: 1.4
+ * Version: 1.4.1
  */
 
 defined( 'ABSPATH' ) || exit;
@@ -191,7 +191,23 @@ add_filter( 'gfpdf_mpdf_class', function( $mpdf, $form, $entry, $settings, $help
 	//die($output);
 	array_unshift($files, [0, 0,0, $output, '']);
 	
-	gf_merge_pdfs_output( $files, $errors );
+	switch ( $helper->get_output_type() ) {
+		case 'DISPLAY':		
+			gf_merge_pdfs_output( $files, $errors );
+			exit;
+		case 'DOWNLOAD':
+			gf_merge_pdfs_output( $files, $errors );
+			exit;
+		case 'SAVE':
+			return new class( ) {
+				public function __construct( ) {
+					//
+				}
+				public function Output() {
+					gf_merge_pdfs_output( $files, $errors );
+				}
+			};
+	}
 
 	return $mpdf;
 }, 10, 5 );
