@@ -3,7 +3,7 @@
  * Plugin Name: Gravity Forms Merge PDFs
  * Description: Adds a merged PDFs field and inlines PDF uploads into Gravity PDF exports.
  * Authors: Gennady Kovshenin, Bob Handzhiev
- * Version: 1.4.4
+ * Version: 1.4.5
  */
 
 defined( 'ABSPATH' ) || exit;
@@ -111,7 +111,7 @@ function convert_url_to_path( $url ) {
 }
 
 // Actually merges and outputs the files using shell commands
-function gf_merge_pdfs_output( $files, $errors ) {
+function gf_merge_pdfs_output( $files, $errors, $entry_id ) {
     $dir = wp_upload_dir();
     $outputName = $dir['path']."/merged-".$entry_id.".pdf";
     
@@ -174,7 +174,7 @@ add_action( 'init', function() {
     
 	[$files, $errors] = gf_merge_pdfs_get_files( $entry_id );
 		
-	gf_merge_pdfs_output( $files, $errors );	
+	gf_merge_pdfs_output( $files, $errors, $entry_id );	
 } );
 
 add_filter( 'gfpdf_mpdf_class', function( $mpdf, $form, $entry, $settings, $helper ) {
@@ -193,19 +193,20 @@ add_filter( 'gfpdf_mpdf_class', function( $mpdf, $form, $entry, $settings, $help
 	
 	switch ( $helper->get_output_type() ) {
 		case 'DISPLAY':		
-			gf_merge_pdfs_output( $files, $errors );
+			gf_merge_pdfs_output( $files, $errors, $entry['id'] );
 			exit;
 		case 'DOWNLOAD':
-			gf_merge_pdfs_output( $files, $errors );
+			gf_merge_pdfs_output( $files, $errors, $entry['id'] );
 			exit;
 		case 'SAVE':
-			return new class( $files, $errors ) {
-				public function __construct( $files, $errors ) {
+			return new class( $files, $errors, $entry['id'] ) {
+				public function __construct( $files, $errors, $entry_id ) {
 					$this->files = $files;
 					$this->errors = $errors;
+					$this->entry_id = $entry_id
 				}
 				public function Output() {
-					gf_merge_pdfs_output( $this->files, $this->errors ?? [] );
+					gf_merge_pdfs_output( $this->files, $this->errors ?? [], $this->$entry_id );
 				}
 			};
 	}
@@ -227,13 +228,14 @@ false && add_filter( 'gravityflowpdf_mpdf', function( $mpdf, $body, $file_path, 
 	$mpdf->WriteHTML( $body );
 	file_put_contents( $output = tempnam( get_temp_dir(), 'merge_pdfs' ), $mpdf->Output( '', 'S' ) );
 
-	return new class( $mpdf ) {
-		public function __construct( $mpdf ) {			
+	return new class( $mpdf,  $entry['id']) {
+		public function __construct( $mpdf, $entry_id ) {			
 			$this->mpdf = $mpdf;
+			$this->entry_id = $entry_id;
 		}
 		public function Output() {
 			array_unshift($files, [0, 0,0, $file_path, '']);	
-            gf_merge_pdfs_output( $files, [] );
+            gf_merge_pdfs_output( $files, [], $this->entry_id );
 		}
 		public function __call( $f, $args ) {
 			return call_user_func_array( [ $this->mpdf, $f ], $args );
