@@ -1,6 +1,9 @@
 <?php
 defined( 'ABSPATH' ) || exit;
 
+use  Gravity_Forms\Gravity_Forms\Orders\Summaries\GF_Order_Summary;
+use  Gravity_Forms\Gravity_Forms\Orders\Factories\GF_Order_Factory;
+
 class GF_Merge_PDFs_Field extends GF_Field {
 
 	public $type = 'merge_pdfs';
