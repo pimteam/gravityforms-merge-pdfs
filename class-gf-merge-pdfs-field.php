@@ -1,8 +1,7 @@
 <?php
 defined( 'ABSPATH' ) || exit;
 
-use  Gravity_Forms\Gravity_Forms\Orders\Summaries\GF_Order_Summary;
-use  Gravity_Forms\Gravity_Forms\Orders\Factories\GF_Order_Factory;
+require_once( GFCommon::get_base_path() . '/entry_detail.php' );
 
 class GF_Merge_PDFs_Field extends GF_Field {
 
