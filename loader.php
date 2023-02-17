@@ -3,7 +3,7 @@
  * Plugin Name: Gravity Forms Merge PDFs
  * Description: Adds a merged PDFs field and inlines PDF uploads into Gravity PDF exports.
  * Authors: Gennady Kovshenin, Bob Handzhiev
- * Version: 1.4.9                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            
+ * Version: 1.5                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           
  */
 
 defined( 'ABSPATH' ) || exit;
@@ -153,6 +153,7 @@ function gf_merge_pdfs_output( $files, $errors, $entry_id ) {
     //header('Content-Length: '.filesize($local_file));
     //header('Content-Disposition: attachment; filename="merged.pdf";');
     readfile( $outputName );
+    unlink($outputName);
     exit;
 }
 
