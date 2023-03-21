@@ -148,6 +148,13 @@ function gf_merge_pdfs_output( $files, $errors, $entry_id ) {
     
     $result = shell_exec($cmd);
     
+     // delete all tmp files
+    $tmp_dir = get_temp_dir();
+    foreach($files as $file) {
+        [$form_id, $field_id, $entry_id, $path, $uri] = $file;
+        if(strstr($path, $tmp_dir)) unlink($path);
+    }
+    
     header('Cache-control: private');
     header('Content-Type: application/pdf');
     //header('Content-Length: '.filesize($local_file));
