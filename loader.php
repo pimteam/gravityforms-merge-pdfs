@@ -3,7 +3,7 @@
  * Plugin Name: Gravity Forms Merge PDFs
  * Description: Adds a merged PDFs field and inlines PDF uploads into Gravity PDF exports.
  * Authors: Gennady Kovshenin, Bob Handzhiev
- * Version: 1.5                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           
+ * Version: 1.4.9                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            
  */
 
 defined( 'ABSPATH' ) || exit;
@@ -111,9 +111,9 @@ function convert_url_to_path( $url ) {
 }
 
 // Actually merges and outputs the files using shell commands
-function gf_merge_pdfs_output( $files, $errors, $entry_id ) {
+function gf_merge_pdfs_output( $files, $errors, $entry_id, $file_name = '' ) {
     $dir = wp_upload_dir();
-    $outputName = $dir['path']."/merged-".$entry_id.".pdf";
+    $outputName = $file_name ? $file_name : $dir['path']."/merged-".$entry_id.".pdf";
     
     // if there are errors, create a file with them
     if( count( $errors ) ) {
@@ -148,7 +148,7 @@ function gf_merge_pdfs_output( $files, $errors, $entry_id ) {
     
     $result = shell_exec($cmd);
     
-     // delete all tmp files
+    // delete all tmp files
     $tmp_dir = get_temp_dir();
     foreach($files as $file) {
         [$form_id, $field_id, $entry_id, $path, $uri] = $file;
@@ -158,7 +158,7 @@ function gf_merge_pdfs_output( $files, $errors, $entry_id ) {
     header('Cache-control: private');
     header('Content-Type: application/pdf');
     //header('Content-Length: '.filesize($local_file));
-    //header('Content-Disposition: attachment; filename="merged.pdf";');
+    header('Content-Disposition: attachment; filename="'.$outputName.'";');
     readfile( $outputName );
     unlink($outputName);
     exit;
@@ -189,22 +189,26 @@ add_filter( 'gfpdf_mpdf_class', function( $mpdf, $form, $entry, $settings, $help
 	if ( ! GFCommon::get_fields_by_type( $form, 'merge_pdfs' ) ) {
 		return $mpdf;
 	}
-    
+		    
     [$files, $errors] = gf_merge_pdfs_get_files( $entry['id'] );
 	if ( ! $files ) {
 		return $mpdf;
 	}
+	
+	// get output file name
+	$model_pdf = GPDFAPI::get_mvc_class( 'Model_PDF' );
+	$file_name = $model_pdf -> get_pdf_name( $settings, $entry ) . '.pdf';
 		
 	file_put_contents( $output = tempnam( get_temp_dir(), 'merge_pdfs' ), $mpdf->Output( '', 'S' ) );
 	//die($output);
 	array_unshift($files, [0, 0,0, $output, '']);
 	
 	switch ( $helper->get_output_type() ) {
-		case 'DISPLAY':		
-			gf_merge_pdfs_output( $files, $errors, $entry['id'] );
+		case 'DISPLAY':
+			gf_merge_pdfs_output( $files, $errors, $entry['id'], $file_name);			
 			exit;
-		case 'DOWNLOAD':
-			gf_merge_pdfs_output( $files, $errors, $entry['id'] );
+		case 'DOWNLOAD':            
+			gf_merge_pdfs_output( $files, $errors, $entry['id'], $file_name );
 			exit;
 		case 'SAVE':
 			return new class( $files, $errors, $entry['id'] ) {
@@ -214,7 +218,7 @@ add_filter( 'gfpdf_mpdf_class', function( $mpdf, $form, $entry, $settings, $help
 					$this->entry_id = $entry_id;
 				}
 				public function Output() {
-					gf_merge_pdfs_output( $this->files, $this->errors ?? [], $this->entry_id );
+					gf_merge_pdfs_output( $this->files, $this->errors ?? [], $this->entry_id, $file_name );
 				}
 			};
 	}
@@ -235,7 +239,7 @@ false && add_filter( 'gravityflowpdf_mpdf', function( $mpdf, $body, $file_path, 
 
 	$mpdf->WriteHTML( $body );
 	file_put_contents( $output = tempnam( get_temp_dir(), 'merge_pdfs' ), $mpdf->Output( '', 'S' ) );
-
+	
 	return new class( $mpdf,  $entry['id']) {
 		public function __construct( $mpdf, $entry_id ) {			
 			$this->mpdf = $mpdf;
