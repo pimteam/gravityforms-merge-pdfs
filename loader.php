@@ -3,7 +3,7 @@
  * Plugin Name: Gravity Forms Merge PDFs
  * Description: Adds a merged PDFs field and inlines PDF uploads into Gravity PDF exports.
  * Authors: Gennady Kovshenin, Bob Handzhiev
- * Version: 1.5.1                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           
+ * Version: 1.5.2                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          
  */
 
 defined( 'ABSPATH' ) || exit;
@@ -114,7 +114,19 @@ function convert_url_to_path( $url ) {
 function gf_merge_pdfs_output( $files, $errors, $entry_id, $file_name = '' ) {
     $dir = wp_upload_dir();
     
+    // stored file exists?
+    $store_path = GFFormsModel :: get_upload_root();
+    $stored_file = $store_path ."merged/".$entry_id.".pdf";
     $outputName = $file_name ? $file_name : "merged-".$entry_id.".pdf";
+    
+    if(file_exists($stored_file)) {
+        // output the file instead of merging again
+        header('Cache-control: private');
+        header('Content-Type: application/pdf');    
+        header('Content-Disposition: attachment; filename="'.$outputName.'";');
+        readfile( $stored_file ); 
+        exit;
+    }    
     
     // if there are errors, create a file with them
     if( count( $errors ) ) {
@@ -158,11 +170,17 @@ function gf_merge_pdfs_output( $files, $errors, $entry_id, $file_name = '' ) {
         if(strstr($path, $tmp_dir)) unlink($path);
     }
     
+    // copy the merged file into stored file location
+    if (!file_exists($store_path.'merged')) {
+        mkdir($store_path.'merged', 0755, true);
+    }
+    copy($outputName, $stored_file);
+    
     header('Cache-control: private');
     header('Content-Type: application/pdf');
     //header('Content-Length: '.filesize($local_file));
     header('Content-Disposition: attachment; filename="'.$outputName.'";');
-    readfile( $outputName );
+    readfile( $outputName );    
     unlink($outputName);
     exit;
 
@@ -297,3 +315,22 @@ false && add_filter( 'gravityflowpdf_mpdf', function( $mpdf, $body, $file_path, 
 	};
 }, 10, 5 );
 */
+
+/**
+* Delete stored merge files on updating or deleting an entry
+**/
+function gf_merge_pdfs_entry_updated($form_id, $entry_id) {
+    $path = GFFormsModel :: get_upload_root();    
+    if(file_exists($path ."merged/".$entry_id.".pdf")) unlink($path ."merged/".$entry_id.".pdf");
+}
+
+add_action('gform_post_update_entry', function($entry, $original_entry){
+    gf_merge_pdfs_entry_updated($entry['form_id'], $entry['id']);
+}, 10, 2);
+add_action('gform_after_update_entry', function($form, $entry_id){        
+    gf_merge_pdfs_entry_updated($form['id'], $entry_id);
+}, 10, 2);
+
+add_action('gform_delete_entry', function($entry_id) {
+    gf_merge_pdfs_entry_updated(0, $entry_id);
+});
