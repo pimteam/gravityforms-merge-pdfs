@@ -3,7 +3,7 @@
  * Plugin Name: Gravity Forms Merge PDFs
  * Description: Adds a merged PDFs field and inlines PDF uploads into Gravity PDF exports.
  * Authors: Gennady Kovshenin, Bob Handzhiev
- * Version: 1.5.3                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         
+ * Version: 1.5.4                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         
  */
 
 defined( 'ABSPATH' ) || exit;
@@ -113,6 +113,7 @@ function convert_url_to_path( $url ) {
 // Actually merges and outputs the files using shell commands
 function gf_merge_pdfs_output( $files, $errors, $entry_id, $file_name = '' ) {
     $dir = wp_upload_dir();
+    $tmp_dir = get_temp_dir();
     
     // stored file exists?
     $store_path = GFFormsModel :: get_upload_root();
@@ -120,6 +121,12 @@ function gf_merge_pdfs_output( $files, $errors, $entry_id, $file_name = '' ) {
     $outputName = $file_name ? $file_name : "merged-".$entry_id.".pdf";
     
     if(file_exists($stored_file)) {
+        // delete all tmp files    
+        foreach($files as $file) {
+            [$form_id, $field_id, $entry_id, $path, $uri] = $file;
+            if(strstr($path, $tmp_dir)) unlink($path);
+        }
+    
         // output the file instead of merging again
         header('Cache-control: private');
         header('Content-Type: application/pdf');    
@@ -163,9 +170,7 @@ function gf_merge_pdfs_output( $files, $errors, $entry_id, $file_name = '' ) {
     
     $result = shell_exec($cmd);
     
-    
-    // delete all tmp files
-    $tmp_dir = get_temp_dir();
+    // delete all tmp files    
     foreach($files as $file) {
         [$form_id, $field_id, $entry_id, $path, $uri] = $file;
         if(strstr($path, $tmp_dir)) unlink($path);
@@ -182,8 +187,13 @@ function gf_merge_pdfs_output( $files, $errors, $entry_id, $file_name = '' ) {
     //header('Content-Length: '.filesize($local_file));
    // header('Content-Disposition: attachment; filename="'.$outputName.'";');
     header('Content-disposition: inline; filename="'.$outputName.'"');
-    readfile( $outputName );    
-    unlink($outputName);
+    header('Content-Transfer-Encoding: binary');
+    header('Accept-Ranges: bytes');
+    ob_clean();
+    flush();
+    if (readfile($outputName)) {
+        unlink($outputName);
+    }   
     exit;
 
 }
