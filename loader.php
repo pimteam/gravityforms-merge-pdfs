@@ -3,7 +3,7 @@
  * Plugin Name: Gravity Forms Merge PDFs
  * Description: Adds a merged PDFs field and inlines PDF uploads into Gravity PDF exports.
  * Authors: Gennady Kovshenin, Bob Handzhiev
- * Version: 1.5.5                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         
+ * Version: 1.6                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        
  */
 
 defined( 'ABSPATH' ) || exit;
@@ -55,6 +55,13 @@ function gf_merge_pdfs_get_files( int $entry_id ) : iterable {
 	}
 	
 	$files = [];
+	
+	if(!empty($_GET['gf_merge_pdfs'])) {
+        $pdfs = GPDFAPI::get_entry_pdfs( $entry_id );	
+        $keys = array_keys($pdfs);
+        $pdf_path = GPDFAPI::create_pdf( $entry_id, $keys[0]);
+        $files[] =  [$entry['form_id'], 0, $entry_id, $pdf_path, '' ]; 
+    }
 	
 	if( !empty( $fields ) ){
 		foreach ( $fields as $field ) {
@@ -221,6 +228,8 @@ add_action( 'init', function() {
 } );
 
 add_filter( 'gfpdf_mpdf_class', function( $mpdf, $form, $entry, $settings, $helper ) {
+    if(!empty($_GET['gf_merge_pdfs'])) return $mpdf;
+    
 	if ( ! GFCommon::get_fields_by_type( $form, 'merge_pdfs' ) ) {
 		return $mpdf;
 	}
