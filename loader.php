@@ -1,9 +1,10 @@
 <?php
 /**
  * Plugin Name: Gravity Forms Merge PDFs
+ * Plugin URI: https://github.com/pimteam/gravityforms-merge-pdfs
  * Description: Adds a merged PDFs field and inlines PDF uploads into Gravity PDF exports.
  * Authors: Gennady Kovshenin, Bob Handzhiev
- * Version: 1.6.3                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        
+ * Version: 1.6.4                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        
  */
 
 defined( 'ABSPATH' ) || exit;
@@ -362,4 +363,19 @@ add_action('gform_after_update_entry', function($form, $entry_id){
 
 add_action('gform_delete_entry', function($entry_id) {
     gf_merge_pdfs_entry_updated(0, $entry_id);
+});
+
+
+// check for updates
+add_action('init', function(){
+    $domain = empty($_SERVER['SERVER_NAME']) ? '' : $_SERVER['SERVER_NAME'];	
+
+	if($domain) {
+		include dirname( __FILE__ ).'/plugin-update-checker/plugin-update-checker.php';	
+		$MyUpdateChecker = Puc_v4_Factory::buildUpdateChecker(
+			'https://cerebralconsulting.net/hosted-plugins/gf-merge-pdf.json',
+		    dirname( __FILE__ ).'/loader.php',
+		    'gf_merge_pdf'
+		);
+	}
 });
