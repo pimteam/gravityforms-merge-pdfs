@@ -121,7 +121,7 @@ function convert_url_to_path( $url ) {
 }
 
 // Actually merges and outputs the files using shell commands
-function gf_merge_pdfs_output( $files, $errors, $entry_id, $file_name = '' ) {
+function gf_merge_pdfs_output( $files, $errors, $entry_id, $file_name = '', $display = true ) {
     $dir = wp_upload_dir();
     $tmp_dir = get_temp_dir();
     
@@ -197,6 +197,9 @@ function gf_merge_pdfs_output( $files, $errors, $entry_id, $file_name = '' ) {
     }
     copy($cmd_name, $stored_file);
     
+    // allow saving without displaying 
+    if(!$display) return;
+    
     header('Cache-control: private');
     header('Content-Type: application/pdf');
     //header('Content-Length: '.filesize($local_file));
@@ -270,7 +273,7 @@ add_filter( 'gfpdf_mpdf_class', function( $mpdf, $form, $entry, $settings, $help
 					$this->entry_id = $entry_id;
 				}
 				public function Output() {
-					gf_merge_pdfs_output( $this->files, $this->errors ?? [], $this->entry_id, $file_name );
+					gf_merge_pdfs_output( $this->files, $this->errors ?? [], $this->entry_id, $file_name, false );
 				}
 			};
 	}
