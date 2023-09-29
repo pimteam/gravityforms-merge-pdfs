@@ -4,7 +4,7 @@
  * Plugin URI: https://github.com/pimteam/gravityforms-merge-pdfs
  * Description: Adds a merged PDFs field and inlines PDF uploads into Gravity PDF exports.
  * Authors: Gennady Kovshenin, Bob Handzhiev
- * Version: 1.6.5                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       
+ * Version: 1.6.6                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       
  */
 
 defined( 'ABSPATH' ) || exit;
@@ -382,3 +382,23 @@ add_action('init', function(){
 		);
 	}
 });
+
+// activation
+register_activation_hook( __FILE__, 'gravity_merge_pdfs_activate' );
+function gravity_merge_pdfs_activate() {
+    if (!function_exists('shell_exec')) {
+        // Deactivate the plugin
+        deactivate_plugins(plugin_basename(__FILE__));
+
+        // Display an error message to the user
+        wp_die('The shell_exec function is disabled on this server. Please enable it to use this plugin.');
+    }
+    
+    if(!class_exists('GPDFAPI')) {
+        // Deactivate the plugin
+        deactivate_plugins(plugin_basename(__FILE__));
+
+        // Display an error message to the user
+        wp_die('The Gravity PDF API must be installed. Please enable it to use this plugin.');
+    }
+}
