@@ -371,6 +371,20 @@ add_action('gform_delete_entry', function($entry_id) {
 
 // check for updates
 add_action('init', function(){
+    if (!function_exists('shell_exec')) {        
+        deactivate_plugins(plugin_basename(__FILE__));        
+        add_action('admin_notices', function(){
+            gf_merge_pdf_activation_notice('The shell_exec function is disabled on this server. Please enable it to use Gravity Forms Merge PDFs.');
+        });
+    }
+    
+    if(!class_exists('GPDFAPI')) {
+       deactivate_plugins(plugin_basename(__FILE__));        
+        add_action('admin_notices', function(){
+            gf_merge_pdf_activation_notice('The Gravity PDF API must be installed. Please enable it to use Gravity Forms Merge PDFs.');
+        });
+    }
+
     $domain = empty($_SERVER['SERVER_NAME']) ? '' : $_SERVER['SERVER_NAME'];	
 
 	if($domain) {
@@ -386,19 +400,21 @@ add_action('init', function(){
 // activation
 register_activation_hook( __FILE__, 'gravity_merge_pdfs_activate' );
 function gravity_merge_pdfs_activate() {
-    if (!function_exists('shell_exec')) {
-        // Deactivate the plugin
+    if (!function_exists('shell_exec')) {        
         deactivate_plugins(plugin_basename(__FILE__));
-
-        // Display an error message to the user
         wp_die('The shell_exec function is disabled on this server. Please enable it to use this plugin.');
     }
     
-    if(!class_exists('GPDFAPI')) {
-        // Deactivate the plugin
+    if(!class_exists('GPDFAPI')) {        
         deactivate_plugins(plugin_basename(__FILE__));
-
-        // Display an error message to the user
         wp_die('The Gravity PDF API must be installed. Please enable it to use this plugin.');
     }
+}
+
+function gf_merge_pdf_activation_notice($notice) {
+    echo '<div class="error">';
+    echo '<p>';
+    echo $notice;
+    echo '</p>';
+    echo '</div>';
 }
