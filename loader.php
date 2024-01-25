@@ -4,7 +4,7 @@
  * Plugin URI: https://github.com/pimteam/gravityforms-merge-pdfs
  * Description: Adds a merged PDFs field and inlines PDF uploads into Gravity PDF exports.
  * Authors: Gennady Kovshenin, Bob Handzhiev
- * Version: 1.6.6                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       
+ * Version: 1.6.7
  */
 
 defined( 'ABSPATH' ) || exit;
@@ -138,6 +138,8 @@ function gf_merge_pdfs_output( $files, $errors, $entry_id, $file_name = '', $dis
             [$form_id, $field_id, $entry_id, $path, $uri] = $file;
             if(strstr($path, $tmp_dir)) unlink($path);
         }
+
+        if(!$display) return $stored_file;
     
         // output the file instead of merging again
         header('Cache-control: private');
@@ -150,7 +152,7 @@ function gf_merge_pdfs_output( $files, $errors, $entry_id, $file_name = '', $dis
     
     // if there are errors, create a file with them
     if( count( $errors ) ) {
-        require('fpdf/fpdf.php');   
+        require_once('fpdf/fpdf.php');
         
         $file_str = implode(', ', array_map( fn( $e ) => basename($e), $errors ) );
         
@@ -198,7 +200,7 @@ function gf_merge_pdfs_output( $files, $errors, $entry_id, $file_name = '', $dis
     copy($cmd_name, $stored_file);
     
     // allow saving without displaying 
-    if(!$display) return;
+    if(!$display) return $stored_file;
     
     header('Cache-control: private');
     header('Content-Type: application/pdf');
@@ -239,30 +241,31 @@ add_action( 'init', function() {
 } );
 
 add_filter( 'gfpdf_mpdf_class', function( $mpdf, $form, $entry, $settings, $helper ) {
+
     if(!empty($_GET['gf_merge_pdfs'])) return $mpdf;
-    
+
 	if ( ! GFCommon::get_fields_by_type( $form, 'merge_pdfs' ) ) {
 		return $mpdf;
 	}
-		    
+
     [$files, $errors] = gf_merge_pdfs_get_files( $entry['id'] );
 	if ( ! $files ) {
 		return $mpdf;
 	}
-	
+
 	// get output file name
 	$model_pdf = GPDFAPI::get_mvc_class( 'Model_PDF' );
 	$file_name = $model_pdf -> get_pdf_name( $settings, $entry ) . '.pdf';
-		
+
 	file_put_contents( $output = tempnam( get_temp_dir(), 'merge_pdfs' ), $mpdf->Output( '', 'S' ) );
 	//die($output);
 	array_unshift($files, [0, 0,0, $output, '']);
-	
+
 	switch ( $helper->get_output_type() ) {
 		case 'DISPLAY':
-			gf_merge_pdfs_output( $files, $errors, $entry['id'], $file_name);			
+			gf_merge_pdfs_output( $files, $errors, $entry['id'], $file_name);
 			exit;
-		case 'DOWNLOAD':            
+		case 'DOWNLOAD':
 			gf_merge_pdfs_output( $files, $errors, $entry['id'], $file_name );
 			exit;
 		case 'SAVE':
@@ -418,3 +421,71 @@ function gf_merge_pdf_activation_notice($notice) {
     echo '</p>';
     echo '</div>';
 }
+
+// bulk downloader
+add_filter(
+	'gform_entry_list_bulk_actions',
+	function( $actions ) {
+		$actions['download_merged_pdf'] =  'Download Merged PDF';
+
+		return $actions;
+	}
+);
+
+// process the bulk actions
+add_action( 'gform_entry_list_action', function ( $action, $entries, $form_id ) : void {
+    if(!current_user_can('manage_options')) return;
+
+    if ( $action == 'download_merged_pdf'){
+		$final_files = [];
+        //$form = GFAPI::get_form( $form_id );
+        foreach ( $entries as $entry_id ) {
+			// generate the PDF
+			[$files, $errors] = gf_merge_pdfs_get_files( $entry_id );
+			$file = gf_merge_pdfs_output($files, $errors, $entry_id, '', false);
+			if($file) $final_files[] = $file;
+        }
+
+		$dir = wp_upload_dir();
+        $zip = new ZipArchive();
+		$zip_file_name = $dir['basedir'].'/gravity_forms/merged/form-'.intval($_GET['id']??0).'.zip';
+		if ($zip->open($zip_file_name, ZipArchive::CREATE) !== true) {
+			die("Error: Cannot create zip archive");
+		}
+
+		foreach ($final_files as $file) {
+			// Make sure the file exists before adding it to the archive
+			if (file_exists($file)) {
+				// Add the file to the archive with its original name
+				$zip->addFile($file, basename($file));
+			} else {
+				echo "Warning: File not found - $file\n";
+			}
+		}
+
+		// Close the zip archive
+		$zip->close();
+		header("Location: ".site_url("?noheader=1&download_merged_zip=".$form_id));
+		exit;
+    }
+}, 10, 3 );
+
+add_action('wp_loaded', function() {
+	if(empty($_GET['download_merged_zip']) or !current_user_can('manage_options')) return;
+
+	$dir = wp_upload_dir();
+	$zip_file_name = $dir['basedir'].'/gravity_forms/merged/form-'.intval($_GET['download_merged_zip']??0).'.zip';
+	header('Cache-control: private');
+    header('Content-Type: application/zip');
+    //header('Content-Length: '.filesize($local_file));
+   // header('Content-Disposition: attachment; filename="'.$outputName.'";');
+    header('Content-disposition: inline; filename="'.basename($zip_file_name).'"');
+    header('Content-Transfer-Encoding: binary');
+    header('Accept-Ranges: bytes');
+    ob_clean();
+    flush();
+    if (readfile($zip_file_name)) {
+        unlink($zip_file_name);
+    }
+    exit;
+});
