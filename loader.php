@@ -126,7 +126,8 @@ function gf_merge_pdfs_output( $files, $errors, $entry_id, $file_name = '', $dis
     $tmp_dir = get_temp_dir();
     
     // stored file exists?
-    $store_path = GFFormsModel :: get_upload_root();
+    //$store_path = GFFormsModel :: get_upload_root();
+	$store_path = $dir['basedir'].'/gravity_forms/';
     $stored_file = $store_path ."merged/".$entry_id.".pdf";
     $outputName = $file_name ? $file_name : "merged-".$entry_id.".pdf";
     $cmd_name = "merged-".$entry_id.".pdf";
