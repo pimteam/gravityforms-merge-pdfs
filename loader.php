@@ -4,7 +4,7 @@
  * Plugin URI: https://github.com/pimteam/gravityforms-merge-pdfs
  * Description: Adds a merged PDFs field and inlines PDF uploads into Gravity PDF exports.
  * Authors: Gennady Kovshenin, Bob Handzhiev
- * Version: 1.6.7
+ * Version: 1.6.8
  */
 
 defined( 'ABSPATH' ) || exit;
@@ -128,10 +128,10 @@ function gf_merge_pdfs_output( $files, $errors, $entry_id, $file_name = '', $dis
     // stored file exists?
     //$store_path = GFFormsModel :: get_upload_root();
 	$store_path = $dir['basedir'].'/gravity_forms/';
-    $stored_file = $store_path ."merged/".$entry_id.".pdf";
     $outputName = $file_name ? $file_name : "merged-".$entry_id.".pdf";
+	$stored_file = $store_path ."merged/".$outputName;
     $cmd_name = "merged-".$entry_id.".pdf";
-    
+
     if(file_exists($stored_file)) {
     
         // delete all tmp files    
@@ -187,7 +187,7 @@ function gf_merge_pdfs_output( $files, $errors, $entry_id, $file_name = '', $dis
     }
     
     $result = shell_exec($cmd);
-    
+
     // delete all tmp files    
     foreach($files as $file) {
         [$form_id, $field_id, $entry_id, $path, $uri] = $file;
@@ -199,7 +199,7 @@ function gf_merge_pdfs_output( $files, $errors, $entry_id, $file_name = '', $dis
         mkdir($store_path.'merged', 0755, true);
     }
     copy($cmd_name, $stored_file);
-    
+
     // allow saving without displaying 
     if(!$display) return $stored_file;
     
@@ -438,29 +438,50 @@ add_action( 'gform_entry_list_action', function ( $action, $entries, $form_id ) 
     if(!current_user_can('manage_options')) return;
 
     if ( $action == 'download_merged_pdf'){
+		// get configurable file names -for the individual merge and for the whole download
+		// use get_form_pdfs( $form_id )
+		$pdfs = GPDFAPI ::  get_form_pdfs( $form_id );
+		$pdf_config = array_filter($pdfs, function($pdf) {
+			if(!empty($pdf['cc_bulk_download'])) return true;
+			return false;
+		});
+		$pdf_config = reset($pdf_config);
+
+		// prepare individual entry PDF file name
+		if(!empty($pdf_config)) {
+			$model_pdf = GPDFAPI::get_mvc_class( 'Model_PDF' );
+			$settings = GPDFAPI :: get_pdf( $form_id, $pdf_config['id'] );
+		}
+
 		$final_files = [];
         //$form = GFAPI::get_form( $form_id );
         foreach ( $entries as $entry_id ) {
 			// generate the PDF
 			[$files, $errors] = gf_merge_pdfs_get_files( $entry_id );
+
 			$file = gf_merge_pdfs_output($files, $errors, $entry_id, '', false);
-			if($file) $final_files[] = $file;
+
+			if($file) $final_files[] = ['file' => $file, 'entry_id' => $entry_id];
         }
 
 		$dir = wp_upload_dir();
         $zip = new ZipArchive();
-		$zip_file_name = $dir['basedir'].'/gravity_forms/merged/form-'.intval($_GET['id']??0).'.zip';
+		$file_name = empty($pdf_config) ? 'form-'.$form_id : $pdf_config['name'];
+		$zip_file_name = $dir['basedir'].'/gravity_forms/merged/'.$file_name.'.zip';
 		if ($zip->open($zip_file_name, ZipArchive::CREATE) !== true) {
 			die("Error: Cannot create zip archive");
 		}
 
 		foreach ($final_files as $file) {
 			// Make sure the file exists before adding it to the archive
-			if (file_exists($file)) {
+			$f = $file['file'];
+			$entry_id = $file['entry_id'];
+			if (file_exists($f)) {
 				// Add the file to the archive with its original name
-				$zip->addFile($file, basename($file));
+				$file_name = empty($settings) ? basename($f) : $model_pdf->get_pdf_name( $settings, GFAPI :: get_entry($entry_id) ).'.pdf';
+				$zip->addFile($f, $file_name);
 			} else {
-				echo "Warning: File not found - $file\n";
+				echo "Warning: File not found - $f\n";
 			}
 		}
 
@@ -474,8 +495,18 @@ add_action( 'gform_entry_list_action', function ( $action, $entries, $form_id ) 
 add_action('wp_loaded', function() {
 	if(empty($_GET['download_merged_zip']) or !current_user_can('manage_options')) return;
 
+	$form_id = intval($_GET['download_merged_zip'] ?? 0);
+
+	$pdfs = GPDFAPI ::  get_form_pdfs( $form_id );
+		$pdf_config = array_filter($pdfs, function($pdf) {
+			if(!empty($pdf['cc_bulk_download'])) return true;
+			return false;
+		});
+	$pdf_config = reset($pdf_config);
+	$file_name = empty($pdf_config) ? 'form-'.$form_id : $pdf_config['name'];
+
 	$dir = wp_upload_dir();
-	$zip_file_name = $dir['basedir'].'/gravity_forms/merged/form-'.intval($_GET['download_merged_zip']??0).'.zip';
+	$zip_file_name = $dir['basedir'].'/gravity_forms/merged/'.$file_name.'.zip';
 	header('Cache-control: private');
     header('Content-Type: application/zip');
     //header('Content-Length: '.filesize($local_file));
@@ -490,3 +521,27 @@ add_action('wp_loaded', function() {
     }
     exit;
 });
+
+/**
+ * Add setting in the Gravity PDF section for each form that allows setting a specific PDF as a bulk-download config for the form
+ * This means that its name and naming template will be used for the generated bulk download
+ **/
+add_filter( 'gfpdf_registered_fields', function( $gfpdf_settings ) {
+
+   /**
+    * Ensure you prefix the array key and ID to prevent any conflicts
+    */
+
+   if ( isset( $gfpdf_settings['general'] ) ) {
+        $gfpdf_settings['form_settings']['cc_bulk_download_default'] = [
+            'id'   => 'cc_bulk_download',
+            'name' => 'Gravity Forms Merge PDFs Bulk Download Settings',
+            'type' => 'checkbox',
+            'desc' => "Use this Gravity PDF feed's name and naming template for bulk merged PDF downloads.",
+            'std'  => '#CCCCCC'
+        ];
+   }
+
+    return $gfpdf_settings;
+} );
+
