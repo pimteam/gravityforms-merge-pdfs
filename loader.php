@@ -129,11 +129,11 @@ function gf_merge_pdfs_output( $files, $errors, $entry_id, $file_name = '', $dis
     //$store_path = GFFormsModel :: get_upload_root();
 	$store_path = $dir['basedir'].'/gravity_forms/';
     $outputName = $file_name ? $file_name : "merged-".$entry_id.".pdf";
-	$stored_file = $store_path ."merged/".$outputName;
+	$stored_file = $store_path ."merged/".$entry_id.".pdf";
     $cmd_name = "merged-".$entry_id.".pdf";
 
-    if(file_exists($stored_file)) {
-    
+    if(file_exists($stored_file) ) {
+
         // delete all tmp files    
         foreach($files as $file) {
             [$form_id, $field_id, $entry_id, $path, $uri] = $file;
