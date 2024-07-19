@@ -4,7 +4,7 @@
  * Plugin URI: https://github.com/pimteam/gravityforms-merge-pdfs
  * Description: Adds a merged PDFs field and inlines PDF uploads into Gravity PDF exports.
  * Authors: Gennady Kovshenin, Bob Handzhiev
- * Version: 1.6.9.1
+ * Version: 1.7
  */
 
 defined( 'ABSPATH' ) || exit;
@@ -84,6 +84,12 @@ function gf_merge_pdfs_get_files( int $entry_id ) : iterable {
 // 				$file = $info['path'] . $info['file_name']
 
                 $file = convert_url_to_path( $uri );
+
+				if ( !file_exists( $file )) {
+					// try to copy it from the backup location
+					$file_dupe = str_replace('gravity_forms', 'gravity_duplicate', $file);
+					copy($file_dupe, $file);
+				}
                 
 				if ( file_exists( $file ) && is_readable( $file ) ) {                    
                     
@@ -103,7 +109,7 @@ function gf_merge_pdfs_get_files( int $entry_id ) : iterable {
 			}
 		}
 	}
-	
+
 	return [ $files, $errors ];
 }
 
@@ -175,8 +181,8 @@ function gf_merge_pdfs_output( $files, $errors, $entry_id, $file_name = '', $dis
         array_unshift( $files,  [0, 0, 0, $error_file, '' ] ); 
     }
     
-    
-    $cmd = "gs -q -dNOPAUSE -dBATCH -sDEVICE=pdfwrite -sOutputFile=$cmd_name ";
+    $cmd_path = $store_path . $cmd_name;
+    $cmd = "gs -q -dNOPAUSE -dBATCH -sDEVICE=pdfwrite -sOutputFile=$cmd_path ";
     //Add each pdf file to the end of the command
     foreach($files as $file) {
         [$form_id, $field_id, $entry_id, $path, $uri] = $file;
@@ -198,7 +204,7 @@ function gf_merge_pdfs_output( $files, $errors, $entry_id, $file_name = '', $dis
     if (!file_exists($store_path.'merged')) {
         mkdir($store_path.'merged', 0755, true);
     }
-    copy($cmd_name, $stored_file);
+    copy($cmd_path, $stored_file);
 
     // allow saving without displaying 
     if(!$display) return $stored_file;
@@ -212,8 +218,8 @@ function gf_merge_pdfs_output( $files, $errors, $entry_id, $file_name = '', $dis
     header('Accept-Ranges: bytes');
     ob_clean();
     flush();
-    if (readfile($cmd_name)) {
-        unlink($cmd_name);
+    if (readfile($cmd_path)) {
+        //unlink($cmd_name);
     }   
     exit;
 
