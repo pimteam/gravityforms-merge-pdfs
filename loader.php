@@ -4,7 +4,7 @@
  * Plugin URI: https://github.com/pimteam/gravityforms-merge-pdfs
  * Description: Adds a merged PDFs field and inlines PDF uploads into Gravity PDF exports.
  * Authors: Gennady Kovshenin, Bob Handzhiev
- * Version: 1.7
+ * Version: 1.7.1
  */
 
 defined( 'ABSPATH' ) || exit;
@@ -135,7 +135,7 @@ function gf_merge_pdfs_output( $files, $errors, $entry_id, $file_name = '', $dis
     //$store_path = GFFormsModel :: get_upload_root();
 	$store_path = $dir['basedir'].'/gravity_forms/';
     $outputName = $file_name ? $file_name : "merged-".$entry_id.".pdf";
-	$stored_file = $store_path ."merged/".$entry_id.".pdf";
+	$stored_file = $store_path ."merged/merged-".$entry_id.".pdf";
     $cmd_name = "merged-".$entry_id.".pdf";
 
     if(file_exists($stored_file) ) {
@@ -181,7 +181,7 @@ function gf_merge_pdfs_output( $files, $errors, $entry_id, $file_name = '', $dis
         array_unshift( $files,  [0, 0, 0, $error_file, '' ] ); 
     }
     
-    $cmd_path = $store_path . $cmd_name;
+    $cmd_path = $store_path ."merged/". $cmd_name;
     $cmd = "gs -q -dNOPAUSE -dBATCH -sDEVICE=pdfwrite -sOutputFile=$cmd_path ";
     //Add each pdf file to the end of the command
     foreach($files as $file) {
