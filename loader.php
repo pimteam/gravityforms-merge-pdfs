@@ -4,7 +4,7 @@
  * Plugin URI: https://github.com/pimteam/gravityforms-merge-pdfs
  * Description: Adds a merged PDFs field and inlines PDF uploads into Gravity PDF exports.
  * Authors: Gennady Kovshenin, Bob Handzhiev
- * Version: 1.7.3
+ * Version: 1.7.4
  */
 
 defined( 'ABSPATH' ) || exit;
@@ -16,6 +16,10 @@ define( 'GRAVITY_MERGE_PDFS_USE_NONCES', false ); // whether to use real WP nonc
 //use PDFMerger\PDFMerger;
 
 add_action( 'gform_loaded', function() {
+	if ( ! class_exists( 'GFForms' ) ) {
+        return; // Gravity Forms not loaded
+    }
+
 	require_once __DIR__ . '/class-gf-merge-pdfs-field.php';
 } );
 
