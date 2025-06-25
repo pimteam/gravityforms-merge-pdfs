@@ -255,7 +255,8 @@ add_filter( 'gfpdf_mpdf_class', function( $mpdf, $form, $entry, $settings, $help
 
     if(!empty($_GET['gf_merge_pdfs'])) return $mpdf;
 
-	if (/*GF_Merge_PDFs_Context::is_notification() && */ !empty($settings['bypass_pdf_merge'])) {
+	// Try to figure out if we are in notification context
+	if (empty($_GET['gf_merge_pdfs']) && !empty($settings['bypass_pdf_merge'])) {
         return $mpdf;
     }
 
@@ -573,34 +574,3 @@ add_filter( 'gfpdf_registered_fields', function( $gfpdf_settings ) {
 
     return $gfpdf_settings;
 } );
-
-// Track Context
-class GF_Merge_PDFs_Context {
-    private static $is_notification = false;
-
-    public static function set_notification_context($is_notification = true) {
-        self::$is_notification = $is_notification;
-    }
-
-    public static function is_notification() {
-        return self::$is_notification;
-    }
-
-    public static function clear_context() {
-        self::$is_notification = false;
-    }
-}
-
-// Set as notification
-add_filter('gform_pre_send_email', function($email_data, $message_format, $notification, $entry) {
-    // Set true
-    GF_Merge_PDFs_Context::set_notification_context(true);
-
-    // Return email data without changes
-    return $email_data;
-}, 1, 4);
-
-// Clear it after sending
-add_action('gform_after_email', function() {
-    GF_Merge_PDFs_Context::clear_context();
-});
