@@ -4,7 +4,7 @@
  * Plugin URI: https://github.com/pimteam/gravityforms-merge-pdfs
  * Description: Adds a merged PDFs field and inlines PDF uploads into Gravity PDF exports.
  * Authors: Gennady Kovshenin, Bob Handzhiev
- * Version: 1.7.5
+ * Version: 1.8
  */
 
 defined( 'ABSPATH' ) || exit;
@@ -130,103 +130,122 @@ function convert_url_to_path( $url ) {
   );
 }
 
-// Actually merges and outputs the files using shell commands
-function gf_merge_pdfs_output( $files, $errors, $entry_id, $file_name = '', $display = true ) {
-    $dir = wp_upload_dir();
-    $tmp_dir = get_temp_dir();
-    
-    // stored file exists?
-    //$store_path = GFFormsModel :: get_upload_root();
-	$store_path = $dir['basedir'].'/gravity_forms/';
-    $outputName = $file_name ? $file_name : "merged-".$entry_id.".pdf";
-	$stored_file = $store_path ."merged/merged-".$entry_id.".pdf";
-    $cmd_name = "merged-".$entry_id.".pdf";
+/**
+ * Merge multiple PDF files and either
+ *   – return the merged content as string  (when $return_content === true)
+ *   – stream / display it in the browser   (when $return_content === false)
+ */
+function gf_merge_pdfs_output( $files, $errors, $entry_id, $file_name = '', $return_content = false ) {
 
-    if(file_exists($stored_file) ) {
+	$upload     = wp_upload_dir();
+	$tmp_dir    = get_temp_dir();
 
-        // delete all tmp files    
-        foreach($files as $file) {
-            [$form_id, $field_id, $entry_id, $path, $uri] = $file;
-            #if(strstr($path, $tmp_dir)) unlink($path);
-        }
+	$store_root = trailingslashit( $upload['basedir'] ) . 'gravity_forms/';
+	$cache_dir  = $store_root . 'merged/';
 
-        if(!$display) return $stored_file;
-    
-        // output the file instead of merging again
-        header('Cache-control: private');
-        header('Content-Type: application/pdf');    
-       // header('Content-Disposition: attachment; filename="'.$outputName.'";');
-       header('Content-disposition: inline; filename="'.$outputName.'"');
-        readfile( $stored_file ); 
-        exit;
-    }    
-    
-    // if there are errors, create a file with them
-    if( count( $errors ) ) {
-        require_once('fpdf/fpdf.php');
-        
-        $file_str = implode(', ', array_map( fn( $e ) => basename($e), $errors ) );
-        
-        $cnt_files = count($files);
-        if( $cnt_files ) {
-            $file_str .= sprintf("\nThere %s %d valid %s for this entry included after this page.", ($cnt_files > 1 ? 'are' : 'is'), $cnt_files, ($cnt_files > 1 ? 'files' : 'file') );
-        }
-        else $file_str .= "\nThere are no valid files for this entry.";
-        
-        $error_file = $dir['path']."/errors-".$entry_id.".pdf";
-        
-        $pdf = new FPDF();
-        $pdf->AddPage();
-        $pdf->SetFont('Arial','B',12);
-        $pdf->MultiCell( 0 , 10, 'The following files are missing or unreadable: ' . $file_str );
-        $pdf->Output( 'F', $error_file );
-        
-        // fake array, we only need path
-        array_unshift( $files,  [0, 0, 0, $error_file, '' ] ); 
-    }
-    
-    $cmd_path = $store_path ."merged/". $cmd_name;
-    $cmd = "gs -q -dNOPAUSE -dBATCH -sDEVICE=pdfwrite -sOutputFile=$cmd_path ";
-    //Add each pdf file to the end of the command
-    foreach($files as $file) {
-        [$form_id, $field_id, $entry_id, $path, $uri] = $file;
-        
-        if(!is_string($path)) continue;
-        
-        $cmd .= '"'.$path.'" ';
-    }
-    
-    $result = shell_exec($cmd);
+	$output_name   = $file_name ? $file_name : "merged-{$entry_id}.pdf";
+	$cached_file   = $cache_dir . $output_name;          // cached copy
+	$tmp_merge_pdf = $tmp_dir . "merge_tmp_{$entry_id}.pdf"; // gs output
 
-    // delete all tmp files    
-    foreach($files as $file) {
-        [$form_id, $field_id, $entry_id, $path, $uri] = $file;
-        #if(strstr($path, $tmp_dir)) unlink($path);
-    }
-    
-    // copy the merged file into stored file location
-    if (!file_exists($store_path.'merged')) {
-        mkdir($store_path.'merged', 0755, true);
-    }
-    copy($cmd_path, $stored_file);
+	/* ---------------------------------------------------------------------
+	 *  If we already have a cached merge – use it
+	 * ------------------------------------------------------------------- */
+	if ( file_exists( $cached_file ) ) {
 
-    // allow saving without displaying 
-    if(!$display) return $stored_file;
-    
-    header('Cache-control: private');
-    header('Content-Type: application/pdf');
-    //header('Content-Length: '.filesize($local_file));
-   // header('Content-Disposition: attachment; filename="'.$outputName.'";');
-    header('Content-disposition: inline; filename="'.$outputName.'"');
-    header('Content-Transfer-Encoding: binary');
-    header('Accept-Ranges: bytes');
-    ob_clean();
-    flush();
-    if (readfile($cmd_path)) {
-        //unlink($cmd_name);
-    }   
-    exit;
+		if ( $return_content ) {
+			return file_get_contents( $cached_file );
+		}
 
+		header( 'Cache-Control: private' );
+		header( 'Content-Type: application/pdf' );
+		header( 'Content-Disposition: inline; filename="' . $output_name . '"' );
+		readfile( $cached_file );
+		exit;
+	}
+
+
+	/* ---------------------------------------------------------------------
+	 *  Build an "error page" if some source files are missing
+	 * ------------------------------------------------------------------- */
+	if ( count( $errors ) ) {
+
+		require_once 'fpdf/fpdf.php';
+
+		$missing = implode( ', ', array_map( 'basename', $errors ) );
+		$cnt     = count( $files );
+
+		$message = 'The following files are missing or unreadable: ' . $missing . "\n";
+		$message .= $cnt
+			? sprintf( 'There %s %d valid %s for this entry included after this page.',
+				$cnt > 1 ? 'are' : 'is',
+				$cnt,
+				$cnt > 1 ? 'files' : 'file'
+			)
+			: 'There are no valid files for this entry.';
+
+		$error_file = $upload['path'] . "/errors-{$entry_id}.pdf";
+
+		$pdf = new FPDF();
+		$pdf->AddPage();
+		$pdf->SetFont( 'Arial', 'B', 12 );
+		$pdf->MultiCell( 0, 10, $message );
+		$pdf->Output( 'F', $error_file );
+
+		// prepend the error file to the list
+		array_unshift( $files, [ 0, 0, 0, $error_file, '' ] );
+	}
+
+	/* ---------------------------------------------------------------------
+	 *  Merge with GhostScript
+	 * ------------------------------------------------------------------- */
+	$gs_cmd = 'gs -q -dNOPAUSE -dBATCH -sDEVICE=pdfwrite -sOutputFile=' . escapeshellarg( $tmp_merge_pdf );
+
+	foreach ( $files as $file ) {
+		[ , , , $path ] = $file;
+
+		if ( ! is_string( $path ) ) {
+			continue;
+		}
+
+		$gs_cmd .= ' ' . escapeshellarg( $path );
+	}
+
+	shell_exec( $gs_cmd );
+
+	/* ---------------------------------------------------------------------
+	 *  Cache merged file for future calls
+	 * ------------------------------------------------------------------- */
+	if ( ! file_exists( $cache_dir ) ) {
+		wp_mkdir_p( $cache_dir );
+	}
+	copy( $tmp_merge_pdf, $cached_file );
+
+
+	/* ---------------------------------------------------------------------
+	 *  Clean up temporary files
+	 * ------------------------------------------------------------------- */
+	foreach ( $files as $file ) {
+		[ , , , $path ] = $file;
+		if ( strpos( $path, $tmp_dir ) === 0 && is_file( $path ) ) {
+			@unlink( $path );
+		}
+	}
+	@unlink( $tmp_merge_pdf );
+
+	/* ---------------------------------------------------------------------
+	 *  Return or output
+	 * ------------------------------------------------------------------- */
+	if ( $return_content ) {
+		return file_get_contents( $cached_file );
+	}
+
+	header( 'Cache-Control: private' );
+	header( 'Content-Type: application/pdf' );
+	header( 'Content-Disposition: inline; filename="' . $output_name . '"' );
+	header( 'Content-Transfer-Encoding: binary' );
+	header( 'Accept-Ranges: bytes' );
+	readfile( $cached_file );
+	exit;
 }
 
 add_action( 'init', function() {
@@ -251,6 +270,9 @@ add_action( 'init', function() {
 	gf_merge_pdfs_output( $files, $errors, $entry_id );	
 } );
 
+/**
+ * DEPRECATED on July 10 2025 in favor of a new function handling notifications and downloads differently
+ *
 add_filter( 'gfpdf_mpdf_class', function( $mpdf, $form, $entry, $settings, $helper ) {
 
     if(!empty($_GET['gf_merge_pdfs'])) return $mpdf;
@@ -299,6 +321,127 @@ add_filter( 'gfpdf_mpdf_class', function( $mpdf, $form, $entry, $settings, $help
 
 	return $mpdf;
 }, 10, 5 );
+*/
+
+############### NEW HANDLING OF Gravity PDF Filters for PDF Generation ##################
+// Added on July 10, 2025 in attempt to make PDF working fine in GF notifications
+
+class GF_Merge_PDFs_Context {
+
+	private static $current = 'browser';
+
+	public static function set( $ctx ) {
+		self::$current = $ctx;
+	}
+
+	public static function get() {
+		return self::$current;
+	}
+}
+
+add_action( 'plugins_loaded', function () {
+	add_filter( 'gfpdf_mpdf_class', 'gf_merge_pdfs_mpdf_filter', 10, 5 );
+
+	/* 1.2 – set „browser“ */
+	add_action( 'gfpdf_pre_view_or_download_pdf', function () {
+		GF_Merge_PDFs_Context::set( 'browser' );
+	}, 1 );
+
+	/* 1.3 – set „notification“ */
+	add_action( 'gfpdf_pre_generate_and_save_pdf_notification', function () {
+		GF_Merge_PDFs_Context::set( 'notification' );
+	}, 1 );
+
+}, 5 );
+
+
+function gf_merge_pdfs_mpdf_filter( $mpdf, $form, $entry, $settings, $helper ) {
+	$context = GF_Merge_PDFs_Context::get();
+
+	#error_log("MERGE PDF context: $context");
+	/* Keep this as before */
+    if ( ! empty( $_GET['gf_merge_pdfs'] ) ) {
+            return $mpdf;
+    }
+
+    /* No “merge_pdfs” field */
+    if ( ! GFCommon::get_fields_by_type( $form, 'merge_pdfs' ) ) {
+            return $mpdf;
+    }
+
+    // bypass merge
+    if($context == 'notification' and !empty($settings['bypass_pdf_merge'])) {
+        return $mpdf;
+    }
+
+    /* get all files */
+    [ $files, $errors ] = gf_merge_pdfs_get_files( $entry['id'] );
+    if ( ! $files ) {
+            return $mpdf;
+    }
+
+    /* Set the current PDF of Gravity PDF as a temp file
+       and add it as a first element for merging */
+    $tmp = tempnam( get_temp_dir(), 'merge_pdfs_' );
+    file_put_contents( $tmp, $mpdf->Output( '', 'S' ) );
+    array_unshift( $files, [ 0, 0, 0, $tmp, '' ] );
+
+    /* Final name of the new PDF */
+    $model_pdf = GPDFAPI::get_mvc_class( 'Model_PDF' );
+    $file_name = $model_pdf->get_pdf_name( $settings, $entry ) . '.pdf';
+
+	$output_type =  $helper->get_output_type();
+
+	// notification context overrides output type
+	if($context == 'notification') $output_type = 'SAVE';
+
+    /* What does Gravity PDF expect to receive? */
+    switch ( $output_type ) {
+
+		/* Show/download from the browser */
+		case 'DISPLAY':
+		case 'DOWNLOAD':
+				gf_merge_pdfs_output( $files, $errors, $entry['id'], $file_name ); // извежда и exit‐ва
+		exit;
+
+		/* SAVE – return an object compatible with mPDF   */
+		case 'SAVE':
+
+			return new class ( $files, $errors, $entry['id'], $file_name ) {
+
+				private $files;
+				private $errors;
+				private $entry_id;
+				private $file_name;
+
+				public function __construct( $files, $errors, $entry_id, $file_name ) {
+					$this->files     = $files;
+					$this->errors    = $errors;
+					$this->entry_id  = $entry_id;
+					$this->file_name = $file_name;
+				}
+
+				/* imitate mPDF’s signature: Output( $filename = '', $dest = 'I' ) */
+				public function Output( $filename = '', $dest = 'S' ) {
+
+					/* always return raw PDF string */
+					return gf_merge_pdfs_output(
+						$this->files,
+						$this->errors,
+						$this->entry_id,
+						$this->file_name,
+						true          // <- return string, don’t echo
+					);
+				}
+			};
+		break;
+    }
+
+    /* by default change nothing */
+    return $mpdf;
+}
+
+############### END NEW HANDLING OF Gravity PDF Filters for PDF Generation ##################
 
 false && add_filter( 'gravityflowpdf_mpdf', function( $mpdf, $body, $file_path, $entry, $step ) {
 	$form = GFAPI::get_form( $entry['form_id'] );
