@@ -4,7 +4,7 @@
  * Plugin URI: https://github.com/pimteam/gravityforms-merge-pdfs
  * Description: Adds a merged PDFs field and inlines PDF uploads into Gravity PDF exports.
  * Authors: Gennady Kovshenin, Bob Handzhiev
- * Version: 1.8
+ * Version: 1.8.1
  */
 
 defined( 'ABSPATH' ) || exit;
@@ -369,8 +369,13 @@ function gf_merge_pdfs_mpdf_filter( $mpdf, $form, $entry, $settings, $helper ) {
             return $mpdf;
     }
 
-    // bypass merge
+    // bypass merge in notifications
     if($context == 'notification' and !empty($settings['bypass_pdf_merge'])) {
+        return $mpdf;
+    }
+
+    // bypass for display/download context
+    if ($context == 'browser' && !empty($settings['bypass_pdf_merge_display_download'])) {
         return $mpdf;
     }
 
@@ -705,13 +710,22 @@ add_filter( 'gfpdf_registered_fields', function( $gfpdf_settings ) {
             'std'  => '#CCCCCC'
         ];
 
-		// Add new bypass setting
+		// Add new bypass setting for notifications
         $gfpdf_settings['form_settings']['bypass_pdf_merge'] = [
             'id'   => 'bypass_pdf_merge',
             'name' => 'Bypass PDF Merging in Notifications',
             'type' => 'checkbox',
             'desc' => "Generate standard PDF without merging (useful for notifications).",
             'std'  => ''
+        ];
+
+		// Add new bypass setting for display/download
+		$gfpdf_settings['form_settings']['bypass_pdf_merge_display_download'] = [
+            'id'    => 'bypass_pdf_merge_display_download',
+            'name' => 'Bypass PDF Merging for Display/Download',
+            'type' => 'checkbox',
+            'desc' => "Generate standard PDF without merging when viewed or downloaded directly from the browser.",
+            'std'   => ''
         ];
    }
 
