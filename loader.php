@@ -4,7 +4,7 @@
  * Plugin URI: https://github.com/pimteam/gravityforms-merge-pdfs
  * Description: Adds a merged PDFs field and inlines PDF uploads into Gravity PDF exports.
  * Authors: Gennady Kovshenin, Bob Handzhiev
- * Version: 1.8.1
+ * Version: 1.8.2
  */
 
 defined( 'ABSPATH' ) || exit;
@@ -148,21 +148,44 @@ function gf_merge_pdfs_output( $files, $errors, $entry_id, $file_name = '', $ret
 	$tmp_merge_pdf = $tmp_dir . "merge_tmp_{$entry_id}.pdf"; // gs output
 
 	/* ---------------------------------------------------------------------
-	 *  If we already have a cached merge – use it
-	 * ------------------------------------------------------------------- */
-	if ( file_exists( $cached_file ) ) {
+	*  Check for cached file and validate against entry modification time
+	* ------------------------------------------------------------------- */
+	$cache_is_valid = false;
 
+	if ( file_exists( $cached_file ) ) {
+		$cache_file_time = filemtime( $cached_file );
+		$entry = GFAPI::get_entry( $entry_id );
+
+		if ( ! is_wp_error( $entry ) && isset( $entry['date_updated'] ) ) {
+			$entry_update_time = strtotime( $entry['date_updated'] );
+		} else {
+			// Fallback to date_created if there is no date_updated
+			$entry_update_time = isset( $entry['date_created'] ) ? strtotime( $entry['date_created'] ) : 0;
+		}
+
+		// Check if the cached file is newer
+		if ( $cache_file_time >= $entry_update_time ) {
+			$cache_is_valid = true;
+		} else {
+			// It's old, delete it
+			@unlink( $cached_file );
+			error_log( "PDF Cache invalidated for entry {$entry_id}: cache file older than entry update" );
+		}
+	}
+
+	// Return cached version only if cache is valid
+	if ( $cache_is_valid ) {
 		if ( $return_content ) {
 			return file_get_contents( $cached_file );
 		}
-
 		header( 'Cache-Control: private' );
 		header( 'Content-Type: application/pdf' );
 		header( 'Content-Disposition: inline; filename="' . $output_name . '"' );
+		header( 'Content-Transfer-Encoding: binary' );
+		header( 'Accept-Ranges: bytes' );
 		readfile( $cached_file );
 		exit;
 	}
-
 
 	/* ---------------------------------------------------------------------
 	 *  Build an "error page" if some source files are missing
@@ -406,7 +429,7 @@ function gf_merge_pdfs_mpdf_filter( $mpdf, $form, $entry, $settings, $helper ) {
 		/* Show/download from the browser */
 		case 'DISPLAY':
 		case 'DOWNLOAD':
-				gf_merge_pdfs_output( $files, $errors, $entry['id'], $file_name ); // извежда и exit‐ва
+				gf_merge_pdfs_output( $files, $errors, $entry['id'], $file_name ); // exit
 		exit;
 
 		/* SAVE – return an object compatible with mPDF   */
@@ -519,6 +542,9 @@ false && add_filter( 'gravityflowpdf_mpdf', function( $mpdf, $body, $file_path, 
 /**
 * Delete stored merge files on updating or deleting an entry
 **/
+/*
+ * DEPRECATED: instead of doing this, we'll check the cached file at the time of accessing it
+
 function gf_merge_pdfs_entry_updated($form_id, $entry_id) {
     #$path = GFFormsModel :: get_upload_root();
 	$dir = wp_upload_dir();
@@ -540,7 +566,7 @@ add_action('gform_after_update_entry', function($form, $entry_id){
 add_action('gform_delete_entry', function($entry_id) {
     gf_merge_pdfs_entry_updated(0, $entry_id);
 });
-
+*/
 
 // check for updates
 add_action('init', function(){
