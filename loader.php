@@ -4,7 +4,7 @@
  * Plugin URI: https://github.com/pimteam/gravityforms-merge-pdfs
  * Description: Adds a merged PDFs field and inlines PDF uploads into Gravity PDF exports.
  * Authors: Gennady Kovshenin, Bob Handzhiev
- * Version: 1.8.2
+ * Version: 1.8.3
  */
 
 defined( 'ABSPATH' ) || exit;
@@ -163,11 +163,31 @@ function gf_merge_pdfs_output( $files, $errors, $entry_id, $file_name = '', $ret
 			$entry_update_time = isset( $entry['date_created'] ) ? strtotime( $entry['date_created'] ) : 0;
 		}
 
-		// Check if the cached file is newer
+		// Check if the cached file is newer than entry update time
 		if ( $cache_file_time >= $entry_update_time ) {
 			$cache_is_valid = true;
+
+			// Additional validation: check if any source files are newer than cache
+			foreach ( $files as $file ) {
+				// Extract file path from the array structure
+				[ , , , $file_path ] = $file;
+
+				if ( ! is_string( $file_path ) || ! file_exists( $file_path ) ) {
+					continue;
+				}
+
+				$file_modification_time = filemtime( $file_path );
+
+				// If any source file is newer than cache, invalidate cache
+				if ( $file_modification_time > $cache_file_time ) {
+					$cache_is_valid = false;
+					@unlink( $cached_file );
+					error_log( "PDF Cache invalidated for entry {$entry_id}: source file {$file_path} is newer than cache" );
+					break;
+				}
+			}
 		} else {
-			// It's old, delete it
+			// Cache is older than entry update, delete it
 			@unlink( $cached_file );
 			error_log( "PDF Cache invalidated for entry {$entry_id}: cache file older than entry update" );
 		}
