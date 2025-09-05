@@ -4,7 +4,7 @@
  * Plugin URI: https://github.com/pimteam/gravityforms-merge-pdfs
  * Description: Adds a merged PDFs field and inlines PDF uploads into Gravity PDF exports.
  * Authors: Gennady Kovshenin, Bob Handzhiev
- * Version: 1.8.3
+ * Version: 1.8.4
  */
 
 defined( 'ABSPATH' ) || exit;
@@ -24,6 +24,7 @@ add_action( 'gform_loaded', function() {
 } );
 
 function gf_merge_pdfs_get_files( int $entry_id ) : iterable {
+	if(!class_exists('GFAPI') or !class_exists('GPDFAPI')) return null;
     
 	$entry = GFAPI::get_entry( $entry_id );
 	$form = GFAPI::get_form( $entry['form_id'] );
@@ -292,6 +293,8 @@ function gf_merge_pdfs_output( $files, $errors, $entry_id, $file_name = '', $ret
 }
 
 add_action( 'init', function() {
+	if(!class_exists('GPDFAPI')) return;
+
 	if ( ! $entry_id = $_GET['gf_merge_pdfs'] ?? 0 ) {
 		return;
 	}
@@ -598,10 +601,12 @@ add_action('init', function(){
     }
     
     if(!class_exists('GPDFAPI')) {
-       deactivate_plugins(plugin_basename(__FILE__));        
+       // deactivate_plugins(plugin_basename(__FILE__));
         add_action('admin_notices', function(){
             gf_merge_pdf_activation_notice('The Gravity PDF API must be installed. Please enable it to use Gravity Forms Merge PDFs.');
         });
+
+		return;
     }
 
     $domain = empty($_SERVER['SERVER_NAME']) ? '' : $_SERVER['SERVER_NAME'];	
@@ -651,6 +656,7 @@ add_filter(
 // process the bulk actions
 add_action( 'gform_entry_list_action', function ( $action, $entries, $form_id ) : void {
     if(!current_user_can('manage_options')) return;
+	if(!class_exists('GPDFAPI')) return;
 
     if ( $action == 'download_merged_pdf'){
 		// get configurable file names -for the individual merge and for the whole download
@@ -709,6 +715,7 @@ add_action( 'gform_entry_list_action', function ( $action, $entries, $form_id ) 
 
 add_action('wp_loaded', function() {
 	if(empty($_GET['download_merged_zip']) or !current_user_can('manage_options')) return;
+	if(!class_exists('GPDFAPI')) return;
 
 	$form_id = intval($_GET['download_merged_zip'] ?? 0);
 
