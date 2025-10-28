@@ -4,7 +4,7 @@
  * Plugin URI: https://github.com/pimteam/gravityforms-merge-pdfs
  * Description: Adds a merged PDFs field and inlines PDF uploads into Gravity PDF exports.
  * Authors: Gennady Kovshenin, Bob Handzhiev
- * Version: 1.8.4
+ * Version: 1.8.5
  */
 
 defined( 'ABSPATH' ) || exit;
@@ -138,6 +138,7 @@ function convert_url_to_path( $url ) {
  */
 function gf_merge_pdfs_output( $files, $errors, $entry_id, $file_name = '', $return_content = false ) {
 
+
 	$upload     = wp_upload_dir();
 	$tmp_dir    = get_temp_dir();
 
@@ -196,9 +197,12 @@ function gf_merge_pdfs_output( $files, $errors, $entry_id, $file_name = '', $ret
 
 	// Return cached version only if cache is valid
 	if ( $cache_is_valid ) {
-		if ( $return_content ) {
-			return file_get_contents( $cached_file );
-		}
+		if ( $return_content === 'path' ) {
+            return $cached_file;
+        }
+        if ( $return_content === true || $return_content === 'content' ) {
+            return file_get_contents( $cached_file );
+        }
 		header( 'Cache-Control: private' );
 		header( 'Content-Type: application/pdf' );
 		header( 'Content-Disposition: inline; filename="' . $output_name . '"' );
@@ -279,9 +283,12 @@ function gf_merge_pdfs_output( $files, $errors, $entry_id, $file_name = '', $ret
 	/* ---------------------------------------------------------------------
 	 *  Return or output
 	 * ------------------------------------------------------------------- */
-	if ( $return_content ) {
-		return file_get_contents( $cached_file );
-	}
+	if ( $return_content === 'path' ) {
+        return $cached_file;
+    }
+    if ( $return_content === true || $return_content === 'content' ) {
+        return file_get_contents( $cached_file );
+    }
 
 	header( 'Cache-Control: private' );
 	header( 'Content-Type: application/pdf' );
