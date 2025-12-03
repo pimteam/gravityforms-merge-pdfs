@@ -4,7 +4,7 @@
  * Plugin URI: https://github.com/pimteam/gravityforms-merge-pdfs
  * Description: Adds a merged PDFs field and inlines PDF uploads into Gravity PDF exports.
  * Authors: Gennady Kovshenin, Bob Handzhiev
- * Version: 1.8.6
+ * Version: 1.8.7
  */
 
 defined( 'ABSPATH' ) || exit;
@@ -63,12 +63,23 @@ function gf_merge_pdfs_get_files( int $entry_id ) : iterable {
 	$files = [];
 	
 	if(!empty($_GET['gf_merge_pdfs'])) {
-        $pdfs = GPDFAPI::get_entry_pdfs( $entry_id );	
-        $keys = array_keys($pdfs);
-        if(!empty($keys[0])) {
-            $pdf_path = GPDFAPI::create_pdf( $entry_id, $keys[0]);
-            $files[] =  [$entry['form_id'], 0, $entry_id, $pdf_path, '' ]; 
-        }        
+		// allowe removing the form PDF by filter
+		$include_form_pdf = apply_filters('gf_merge_pdfs_include_form_pdf', true,
+			$entry,
+			'endpoint',       // context: direct endpoint ?gf_merge_pdfs=
+			null,             // $form (it's в $entry['form_id'])
+			null,             // $settings
+			null              // $helper
+		);
+
+		if ( $include_form_pdf ) {
+			$pdfs = GPDFAPI::get_entry_pdfs( $entry_id );
+			$keys = array_keys($pdfs);
+			if(!empty($keys[0])) {
+				$pdf_path = GPDFAPI::create_pdf( $entry_id, $keys[0]);
+				$files[] =  [$entry['form_id'], 0, $entry_id, $pdf_path, '' ];
+			}
+		}
     }
 	
 	if( !empty( $fields ) ){
@@ -438,11 +449,25 @@ function gf_merge_pdfs_mpdf_filter( $mpdf, $form, $entry, $settings, $helper ) {
             return $mpdf;
     }
 
+    // allow filter to exclude the form PDF
+    $include_form_pdf = apply_filters(
+		'gf_merge_pdfs_include_form_pdf',
+		true,
+		$entry,
+		'gravitypdf',
+		$form,
+		$settings,
+		$helper
+	);
+
+
     /* Set the current PDF of Gravity PDF as a temp file
        and add it as a first element for merging */
-    $tmp = tempnam( get_temp_dir(), 'merge_pdfs_' );
-    file_put_contents( $tmp, $mpdf->Output( '', 'S' ) );
-    array_unshift( $files, [ 0, 0, 0, $tmp, '' ] );
+	if ( $include_form_pdf ) {
+		$tmp = tempnam( get_temp_dir(), 'merge_pdfs_' );
+		file_put_contents( $tmp, $mpdf->Output( '', 'S' ) );
+		array_unshift( $files, [ 0, 0, 0, $tmp, '' ] );
+	}
 
     /* Final name of the new PDF */
     $model_pdf = GPDFAPI::get_mvc_class( 'Model_PDF' );
