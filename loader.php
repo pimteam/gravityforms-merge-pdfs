@@ -770,7 +770,7 @@ add_action('wp_loaded', function() {
     header('Content-Type: application/zip');
     //header('Content-Length: '.filesize($local_file));
    // header('Content-Disposition: attachment; filename="'.$outputName.'";');
-    header('Content-disposition: inline; filename="'.basename($zip_file_name).'"');
+    header('Content-disposition: attachment; filename="'.basename($zip_file_name).'"');
     header('Content-Transfer-Encoding: binary');
     header('Accept-Ranges: bytes');
     ob_clean();
